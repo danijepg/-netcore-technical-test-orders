@@ -11,5 +11,7 @@ namespace Core.Messages.Events
 
         public Guid Correlation { get; set; }
 
+        public IDictionary<string, decimal> Items { get; set; }
+
     }
 }

@@ -1,32 +1,53 @@
-﻿using Core.Messages.Commands;
+﻿using Core.Domain.Models;
+using Core.Messages.Commands;
+using Core.Messages.Events;
+using Core.Persistence;
+using Light.GuardClauses;
+using MassTransit;
 using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Collections.Concurrent;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace Core.Domain.Models
+namespace Core.Handlers.Commands
 {
-    public class OrderAggregateRoot
+    public class OrderCommandHandler : IRequestHandler<CreateOrderCommand>
     {
-        public Guid Id { get; set; }
+        private IBus BusClient { get; }
 
-        public IDictionary<string, decimal> Items { get; set; }
+        private IOrderAggregateRootRepository Repository { get; }
 
-        public List<CreateOrderCommand> Events { get; set; }
+        //private IWritingContext<Order> orders; 
 
-        public OrderAggregateRoot(CreateOrderCommand command)
+        public OrderCommandHandler(
+            IOrderAggregateRootRepository repo,
+            IBus bus)
         {
-            this.Events = new List<CreateOrderCommand>();
-
-            this.Apply(command);
+            this.Repository = repo.MustNotBeDefault();
+            this.BusClient = bus.MustNotBeDefault(nameof(bus));
         }
 
-        private void Apply(CreateOrderCommand command)
+        public Task<Unit> Handle(CreateOrderCommand request, CancellationToken cancellationToken)
         {
-            this.Events.Add(command);
+            OrderAggregateRoot aggregate = new OrderAggregateRoot(request);
+            //orders.save(aggregate)
 
-            this.Id = command.Id;
-            this.Items = command.Items;
+            Repository.Insert(request);
+
+            var @event = new OrderCreatedEvent
+            {
+                Id = request.Id,
+                Correlation = request.Id,
+                Items = request.Items,
+            };
+
+            //Transactions are obviously wrong at this point. In case an exception is thrown during the creation/publishing of the event
+            //the entire handling (inclusing the storing of the aggregate) should be reverted via rollback. There is nothing to do here anyway
+            //The transaccion should be handled across the thread. This requires a more complex database pooling that the one presented
+            //here
+            this.BusClient.Publish(@event);
+            
+            return Unit.Task;
         }
     }
 }
