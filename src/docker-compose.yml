@@ -1,0 +1,31 @@
+﻿version: '3'
+services:
+  web:
+    container_name: 'userzoom-test'
+    image: 'userzoom-test'
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '8090:80'
+    depends_on:
+      - 'postgres'
+      - 'rabbitmq'
+
+  postgres:
+    ports:
+      - '5432:5432'
+    container_name: postgresql
+    image: 'postgres:12'
+    environment:
+      POSTGRES_USER: userzoom
+      POSTGRES_PASSWORD: userzoom
+      POSTGRES_DB: userzoom
+
+
+  rabbitmq:
+    ports:
+      - '15672:15672'
+      - '5672:5672'
+    container_name: rabbitmq
+    image: 'rabbitmq:3-management'
